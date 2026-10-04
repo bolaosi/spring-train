@@ -1,0 +1,49 @@
+- main "春日山林动态景观" [ref=e2]:
+  - generic [ref=e59]: SPRING / FIELD 01
+  - region "场景介绍":
+    - paragraph: A LANDSCAPE IN MOTION
+    - heading "春天，正在生长。" [level=2]
+    - paragraph: 山风穿过林间，光落在水面。
+  - complementary [ref=e60]:
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - paragraph [ref=e63]: LIVE LANDSCAPE
+        - heading "场景参数" [level=1] [ref=e65]
+        - paragraph [ref=e66]: 轻轻调节，让这片春林有不同的呼吸。
+      - generic [aria-hidden] [ref=e67]: 01 / 08
+    - form "动态景观参数" [ref=e68]:
+      - generic [ref=e69]:
+        - generic [ref=e70]: 行进速度
+        - slider "行进速度" [ref=e71]: "0.76"
+        - status [ref=e72]: 0.76×
+      - generic [ref=e73]:
+        - generic [ref=e74]: 视角缩放
+        - slider "视角缩放" [ref=e75]: "1"
+        - status [ref=e76]: 1.00×
+      - generic [ref=e77]:
+        - generic [ref=e78]: 垂直位置
+        - slider "垂直位置" [ref=e79]: "0"
+        - status [ref=e80]: 0 px
+      - generic [ref=e81]:
+        - generic [ref=e82]: 云层浮动
+        - slider "云层浮动" [ref=e83]: "0.68"
+        - status [ref=e84]: 0.68×
+      - generic [ref=e85]:
+        - generic [ref=e86]: 山峦起伏
+        - slider "山峦起伏" [ref=e87]: "0.55"
+        - status [ref=e88]: 55%
+      - generic [ref=e89]:
+        - generic [ref=e90]: 林冠繁茂
+        - slider "林冠繁茂" [ref=e91]: "1"
+        - status [ref=e92]: 100%
+      - generic [ref=e93]:
+        - generic [ref=e94]: 细节强度
+        - slider "细节强度" [ref=e95]: "0.72"
+        - status [ref=e96]: 72%
+      - generic [ref=e97]:
+        - generic [ref=e98]: 日光曝光
+        - slider "日光曝光" [ref=e99]: "1"
+        - status [ref=e100]: 1.00×
+    - generic [ref=e101]:
+      - generic [ref=e102]: DRAG TO SHAPE THE VIEW
+      - button "恢复默认" [ref=e103] [cursor=pointer]

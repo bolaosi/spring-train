@@ -1,0 +1,191 @@
+{
+  "errors": [],
+  "layouts": [
+    {
+      "viewport": [
+        1600,
+        900
+      ],
+      "scroll": [
+        1600,
+        900
+      ],
+      "panel": [
+        1232,
+        192.6796875,
+        1576,
+        707.3203125
+      ],
+      "button": [
+        1473,
+        657.3203125,
+        1552,
+        689.3203125
+      ]
+    },
+    {
+      "viewport": [
+        1280,
+        720
+      ],
+      "scroll": [
+        1280,
+        720
+      ],
+      "panel": [
+        912,
+        102.6796875,
+        1256,
+        617.3203125
+      ],
+      "button": [
+        1153,
+        567.3203125,
+        1232,
+        599.3203125
+      ]
+    },
+    {
+      "viewport": [
+        390,
+        844
+      ],
+      "scroll": [
+        390,
+        844
+      ],
+      "panel": [
+        12,
+        474.25,
+        378,
+        832
+      ],
+      "button": [
+        283,
+        788,
+        362,
+        820
+      ]
+    },
+    {
+      "viewport": [
+        320,
+        568
+      ],
+      "scroll": [
+        320,
+        568
+      ],
+      "panel": [
+        8,
+        277.25,
+        312,
+        560
+      ],
+      "button": [
+        222,
+        518,
+        301,
+        550
+      ]
+    },
+    {
+      "viewport": [
+        844,
+        390
+      ],
+      "scroll": [
+        844,
+        390
+      ],
+      "panel": [
+        502,
+        44.453125,
+        832,
+        345.546875
+      ],
+      "button": [
+        740,
+        308.546875,
+        817,
+        335.546875
+      ]
+    },
+    {
+      "viewport": [
+        667,
+        375
+      ],
+      "scroll": [
+        667,
+        375
+      ],
+      "panel": [
+        341.515625,
+        36.953125,
+        655,
+        338.046875
+      ],
+      "button": [
+        563,
+        301.046875,
+        640,
+        328.046875
+      ]
+    }
+  ],
+  "parameters": {
+    "zoom": {
+      "changed": true,
+      "output": "1.18×"
+    },
+    "height": {
+      "changed": true,
+      "output": "+70 px"
+    },
+    "clouds": {
+      "changed": true,
+      "output": "1.40×"
+    },
+    "mountains": {
+      "changed": true,
+      "output": "120%"
+    },
+    "canopy": {
+      "changed": true,
+      "output": "140%"
+    },
+    "detail": {
+      "changed": true,
+      "output": "140%"
+    },
+    "exposure": {
+      "changed": true,
+      "output": "1.24×"
+    },
+    "speed-0.2": {
+      "animated": true
+    },
+    "speed-1.8": {
+      "animated": true
+    }
+  },
+  "directFile": "春野 · 一幅正在生长的山林",
+  "keyboard": {
+    "before": "0.76",
+    "after": "0.77"
+  },
+  "exposureRendered": [
+    "brightness(0.78)",
+    "brightness(1.24)"
+  ],
+  "reducedMotionStatic": true,
+  "automaticMotion": true,
+  "performance": {
+    "frames": 94,
+    "averageCostMs": 1.8000000002298584,
+    "p95CostMs": 4.100000001490116,
+    "medianFrameMs": 16.700000000000273,
+    "p95FrameMs": 49.99999999999977
+  }
+}
