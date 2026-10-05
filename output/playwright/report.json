@@ -57,9 +57,9 @@
         720
       ],
       "panel": [
-        1016,
+        1028,
         175.5,
-        1264,
+        1276,
         544.5
       ],
       "controlsInsidePanel": true
@@ -193,6 +193,7 @@
     }
   },
   "resources": [
+    "file:///D:/shortcut/word/%E5%88%9B%E4%BD%9C%E5%8C%BA/spring-train/spring-train/%E7%81%AB%E8%BD%A6%E9%B8%A3%E7%AC%9B%E5%A3%B0.mp3",
     "file:///D:/shortcut/word/%E5%88%9B%E4%BD%9C%E5%8C%BA/spring-train/spring-train/Outer%20Wilds.mp3",
     "file:///D:/shortcut/word/%E5%88%9B%E4%BD%9C%E5%8C%BA/spring-train/spring-train/app.js",
     "file:///D:/shortcut/word/%E5%88%9B%E4%BD%9C%E5%8C%BA/spring-train/spring-train/index.html",
@@ -208,8 +209,10 @@
   "reducedMotionStatic": true,
   "audio": {
     "bundledLoop": true,
-    "statusAfterInteraction": "环境声已开启 · 火车声间歇出现",
-    "rumbleOscillatorsCreated": 4,
+    "statusAfterInteraction": "环境声已开启 · 火车鸣笛间歇出现",
+    "whistlePlayCalls": 1,
+    "backgroundVolume": 0.18,
+    "backgroundDuckDisabled": true,
     "autoplayFallback": true
   },
   "externalRequests": []

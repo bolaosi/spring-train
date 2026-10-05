@@ -5,12 +5,14 @@
   const SCENE_HEIGHT = 576;
   const SKYLINE = 118;
   const MUSIC_VOLUME = 0.18;
-  const MUSIC_DUCK_GAIN = 0.08;
+  const WHISTLE_GAIN = 0.14;
+  const MAX_PIXEL_RATIO = 1.5;
   const canvas = document.getElementById("landscape");
   const context = canvas.getContext("2d", { alpha: false, desynchronized: true });
   const controls = Array.from(document.querySelectorAll("[data-param]"));
   const resetButton = document.getElementById("reset-controls");
   const backgroundMusic = document.getElementById("background-music");
+  const trainWhistle = document.getElementById("train-whistle");
   const audioStatus = document.getElementById("audio-status");
   const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -46,12 +48,15 @@
   let reduced = motionPreference.matches;
   let audioContext = null;
   let musicGain = null;
-  let trainRumbleBus = null;
+  let whistleGain = null;
+  let whistleFilter = null;
   let audioUnlocked = false;
   let audioStarting = false;
-  let rumbleTimer = 0;
-  let rumbleEndTimer = 0;
-  let activeRumble = null;
+  let whistleTimer = 0;
+  let whistleEndTimer = 0;
+  let whistlePlaying = false;
+  let fastRender = false;
+  let fastRenderTimer = 0;
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const unit = (value, min, max) => clamp((value - min) / (max - min), 0, 1);
@@ -63,19 +68,34 @@
   }
 
   function createAudioGraph() {
-    if (musicGain && trainRumbleBus) return;
+    if (musicGain && (!trainWhistle || whistleGain)) return;
     const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextConstructor || !backgroundMusic) throw new Error("Web Audio is unavailable");
     if (!audioContext) audioContext = new AudioContextConstructor();
-    const musicSource = audioContext.createMediaElementSource(backgroundMusic);
-    musicGain = audioContext.createGain();
-    musicGain.gain.value = 1;
-    musicSource.connect(musicGain);
-    musicGain.connect(audioContext.destination);
-    trainRumbleBus = audioContext.createGain();
-    // Keep the rumble clearly above the quieter ambience without hard clipping.
-    trainRumbleBus.gain.value = 1.08;
-    trainRumbleBus.connect(audioContext.destination);
+    if (!musicGain) {
+      const musicSource = audioContext.createMediaElementSource(backgroundMusic);
+      musicGain = audioContext.createGain();
+      musicGain.gain.value = 1;
+      musicSource.connect(musicGain);
+      musicGain.connect(audioContext.destination);
+    }
+    if (trainWhistle && !whistleGain) {
+      const whistleSource = audioContext.createMediaElementSource(trainWhistle);
+      whistleGain = audioContext.createGain();
+      whistleGain.gain.value = WHISTLE_GAIN;
+      whistleFilter = audioContext.createBiquadFilter();
+      whistleFilter.type = "highpass";
+      whistleFilter.frequency.value = 420;
+      whistleFilter.Q.value = 0.55;
+      const whistleTone = audioContext.createBiquadFilter();
+      whistleTone.type = "lowpass";
+      whistleTone.frequency.value = 6400;
+      whistleTone.Q.value = 0.42;
+      // The supplied whistle stays bright, while the two gentle filters keep
+      // its sharp edge from becoming abrasive beside the music.
+      whistleSource.connect(whistleFilter).connect(whistleTone).connect(whistleGain);
+      whistleGain.connect(audioContext.destination);
+    }
   }
 
   function activateTrainSoundAfterAutoplay() {
@@ -92,8 +112,8 @@
         if (audioContext !== context || context.state !== "running") return;
         createAudioGraph();
         audioUnlocked = true;
-        setAudioStatus("环境声已开启 · 火车声间歇出现", true);
-        scheduleNextRumble(true);
+        setAudioStatus("环境声已开启 · 火车鸣笛间歇出现", true);
+        scheduleNextWhistle(true);
       }).catch(() => {
         if (!audioUnlocked) setAudioStatus("背景音乐已播放 · 点击开启火车声", true);
       });
@@ -114,8 +134,8 @@
       Promise.all([resumePromise, musicPromise]).then(() => {
         audioUnlocked = true;
         audioStarting = false;
-        setAudioStatus("环境声已开启 · 火车声间歇出现", true);
-        scheduleNextRumble(true);
+        setAudioStatus("环境声已开启 · 火车鸣笛间歇出现", true);
+        scheduleNextWhistle(true);
       }).catch(() => {
         audioStarting = false;
         setAudioStatus("点击/触摸开启声音", false);
@@ -126,127 +146,54 @@
     }
   }
 
-  function scheduleNextRumble(firstEvent) {
-    if (!audioUnlocked || !visible) return;
-    if (rumbleTimer) window.clearTimeout(rumbleTimer);
-    // Let the first event arrive soon enough to be heard during a normal
-    // preview, then return to a less predictable longer interval.
-    const delay = firstEvent ? 2200 + Math.random() * 1800 : 14000 + Math.random() * 14000;
-    rumbleTimer = window.setTimeout(() => {
-      rumbleTimer = 0;
-      playTrainRumble();
-      scheduleNextRumble(false);
+  function scheduleNextWhistle(firstEvent) {
+    if (!audioUnlocked || !visible || !trainWhistle) return;
+    if (whistleTimer) window.clearTimeout(whistleTimer);
+    // The first whistle is deliberately soon enough to verify. Later events
+    // remain sparse so the supplied sound stays an occasional scene detail.
+    const delay = firstEvent ? 3200 + Math.random() * 2200 : 18000 + Math.random() * 14000;
+    whistleTimer = window.setTimeout(() => {
+      whistleTimer = 0;
+      playTrainWhistle();
+      scheduleNextWhistle(false);
     }, delay);
   }
 
-  function playTrainRumble() {
-    if (!audioUnlocked || !audioContext || !trainRumbleBus || !visible) return;
-    const now = audioContext.currentTime;
-    const duration = 4.8 + Math.random() * 2.8;
-    const end = now + duration;
-    const eventGain = audioContext.createGain();
-    eventGain.gain.setValueAtTime(0.0001, now);
-    eventGain.gain.exponentialRampToValueAtTime(0.68 + Math.random() * 0.12, now + 0.58);
-    eventGain.gain.setTargetAtTime(0.52 + Math.random() * 0.12, now + 0.62, 0.5);
-    eventGain.gain.setTargetAtTime(0.0001, end - 1.1, 0.55);
-    eventGain.connect(trainRumbleBus);
-
-    const lowPass = audioContext.createBiquadFilter();
-    lowPass.type = "lowpass";
-    lowPass.frequency.value = 190 + Math.random() * 70;
-    lowPass.Q.value = 0.82;
-    lowPass.connect(eventGain);
-
-    const oscillators = [];
-    const mainTone = audioContext.createOscillator();
-    mainTone.type = "sawtooth";
-    mainTone.frequency.setValueAtTime(31 + Math.random() * 8, now);
-    const mainToneGain = audioContext.createGain();
-    mainToneGain.gain.value = 0.3;
-    mainTone.connect(mainToneGain).connect(lowPass);
-    mainTone.start(now);
-    mainTone.stop(end);
-    oscillators.push(mainTone);
-
-    const harmonic = audioContext.createOscillator();
-    harmonic.type = "triangle";
-    harmonic.frequency.setValueAtTime(63 + Math.random() * 14, now);
-    const harmonicGain = audioContext.createGain();
-    harmonicGain.gain.value = 0.2;
-    harmonic.connect(harmonicGain).connect(lowPass);
-    harmonic.start(now);
-    harmonic.stop(end);
-    oscillators.push(harmonic);
-
-    const subTone = audioContext.createOscillator();
-    subTone.type = "sine";
-    subTone.frequency.setValueAtTime(24 + Math.random() * 6, now);
-    const subGain = audioContext.createGain();
-    subGain.gain.value = 0.28;
-    subTone.connect(subGain).connect(eventGain);
-    subTone.start(now);
-    subTone.stop(end);
-    oscillators.push(subTone);
-
-    // A low-mid mechanical layer makes the event readable on small speakers;
-    // the deeper tones above still provide the distant steam-train weight.
-    const presenceTone = audioContext.createOscillator();
-    presenceTone.type = "triangle";
-    presenceTone.frequency.setValueAtTime(96 + Math.random() * 18, now);
-    const presenceGain = audioContext.createGain();
-    presenceGain.gain.value = 0.18;
-    presenceTone.connect(presenceGain).connect(lowPass);
-    presenceTone.start(now);
-    presenceTone.stop(end);
-    oscillators.push(presenceTone);
-
-    const sampleCount = Math.ceil(audioContext.sampleRate * 2);
-    const noiseBuffer = audioContext.createBuffer(1, sampleCount, audioContext.sampleRate);
-    const noiseData = noiseBuffer.getChannelData(0);
-    for (let index = 0; index < sampleCount; index += 1) noiseData[index] = Math.random() * 2 - 1;
-    const noise = audioContext.createBufferSource();
-    noise.buffer = noiseBuffer;
-    noise.loop = true;
-    const noiseFilter = audioContext.createBiquadFilter();
-    noiseFilter.type = "lowpass";
-    noiseFilter.frequency.value = 240 + Math.random() * 90;
-    const noiseGain = audioContext.createGain();
-    noiseGain.gain.value = 0.18;
-    noise.connect(noiseFilter).connect(noiseGain).connect(eventGain);
-    noise.start(now);
-    noise.stop(end);
-    oscillators.push(noise);
-
-    // Briefly lower the music under the train event so its low mechanical
-    // rumble reads clearly without muting the ambience entirely.
-    musicGain.gain.cancelScheduledValues(now);
-    musicGain.gain.setValueAtTime(musicGain.gain.value, now);
-    musicGain.gain.linearRampToValueAtTime(MUSIC_DUCK_GAIN, now + 0.55);
-    musicGain.gain.setTargetAtTime(1, end - 0.45, 0.42);
-
-    activeRumble = { eventGain, oscillators };
-    oscillators.forEach((oscillator) => oscillator.addEventListener("ended", () => oscillator.disconnect(), { once: true }));
-    rumbleEndTimer = window.setTimeout(() => {
-      activeRumble = null;
-      rumbleEndTimer = 0;
-    }, duration * 1000 + 250);
+  function finishTrainWhistle() {
+    if (!trainWhistle) return;
+    trainWhistle.pause();
+    try { trainWhistle.currentTime = 0; } catch (error) { /* media may still be loading */ }
+    whistlePlaying = false;
+    if (whistleEndTimer) window.clearTimeout(whistleEndTimer);
+    whistleEndTimer = 0;
+    if (whistleGain && audioContext) {
+      const now = audioContext.currentTime;
+      whistleGain.gain.cancelScheduledValues(now);
+      whistleGain.gain.setTargetAtTime(WHISTLE_GAIN, now, 0.12);
+    }
   }
 
-  function stopRumbleForHiddenPage() {
-    if (rumbleTimer) window.clearTimeout(rumbleTimer);
-    if (rumbleEndTimer) window.clearTimeout(rumbleEndTimer);
-    rumbleTimer = 0;
-    rumbleEndTimer = 0;
-    if (!audioContext || !musicGain || !activeRumble) return;
+  function playTrainWhistle() {
+    if (!audioUnlocked || !audioContext || !whistleGain || !trainWhistle || !visible) return;
+    finishTrainWhistle();
     const now = audioContext.currentTime;
-    activeRumble.eventGain.gain.cancelScheduledValues(now);
-    activeRumble.eventGain.gain.setTargetAtTime(0.0001, now, 0.08);
-    activeRumble.oscillators.forEach((oscillator) => {
-      try { oscillator.stop(now + 0.35); } catch (error) { /* already ended */ }
-    });
-    musicGain.gain.cancelScheduledValues(now);
-    musicGain.gain.setTargetAtTime(1, now, 0.18);
-    activeRumble = null;
+    whistleGain.gain.cancelScheduledValues(now);
+    whistleGain.gain.setValueAtTime(0.0001, now);
+    whistleGain.gain.linearRampToValueAtTime(WHISTLE_GAIN, now + 0.16);
+    const playback = trainWhistle.play();
+    if (playback && typeof playback.catch === "function") playback.catch(() => finishTrainWhistle());
+    whistlePlaying = true;
+    const duration = Number.isFinite(trainWhistle.duration) && trainWhistle.duration > 0
+      ? Math.min(trainWhistle.duration, 9.5)
+      : 7.2;
+    whistleGain.gain.setTargetAtTime(0.0001, now + Math.max(1.2, duration - 0.9), 0.34);
+    whistleEndTimer = window.setTimeout(finishTrainWhistle, duration * 1000);
+  }
+
+  function stopWhistleForHiddenPage() {
+    if (whistleTimer) window.clearTimeout(whistleTimer);
+    whistleTimer = 0;
+    finishTrainWhistle();
   }
 
   if (backgroundMusic) {
@@ -262,6 +209,12 @@
     ["pointerdown", "touchstart", "keydown"].forEach((eventName) => {
       window.addEventListener(eventName, unlockAmbientSound, { passive: true, capture: true });
     });
+  }
+
+  if (trainWhistle) {
+    trainWhistle.volume = 1;
+    trainWhistle.addEventListener("ended", finishTrainWhistle);
+    trainWhistle.addEventListener("error", () => setAudioStatus("火车鸣笛文件无法读取", false));
   }
 
   function randomAt(seed) {
@@ -291,7 +244,9 @@
   function resizeCanvas() {
     const width = Math.max(1, window.innerWidth);
     const height = Math.max(1, window.innerHeight);
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    // The scene is intentionally soft-focus; cap backing resolution so
+    // mobile GPUs do not blur a 3x/4x canvas while sliders are dragged.
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
     const scale = Math.max(width / SCENE_WIDTH, height / SCENE_HEIGHT);
     view = {
       width: width,
@@ -313,6 +268,24 @@
     const value = settings.exposure;
     const normalized = unit(value, 0.74, 1.3);
     canvas.style.filter = "brightness(" + value.toFixed(3) + ") contrast(" + (0.9 + normalized * 0.2).toFixed(3) + ") saturate(" + (0.88 + normalized * 0.2).toFixed(3) + ")";
+  }
+
+  function finishFastRender() {
+    fastRender = false;
+    fastRenderTimer = 0;
+    if (reduced) drawFrame(elapsed);
+  }
+
+  function markControlInteraction() {
+    fastRender = true;
+    if (fastRenderTimer) window.clearTimeout(fastRenderTimer);
+    fastRenderTimer = window.setTimeout(finishFastRender, 140);
+  }
+
+  function releaseControlInteraction() {
+    if (!fastRender) return;
+    if (fastRenderTimer) window.clearTimeout(fastRenderTimer);
+    fastRenderTimer = window.setTimeout(finishFastRender, 90);
   }
 
   function updateInput(input) {
@@ -358,7 +331,7 @@
   }
 
   function drawMountain(depth, base, phase, amplitude, colors, time, travel, layerIndex) {
-    const step = Math.max(14, 22 * view.scale);
+    const step = Math.max(fastRender ? 22 : 14, (fastRender ? 31 : 22) * view.scale);
     const points = [];
     for (let x = -step * 2; x <= view.width + step * 2; x += step) {
       const worldX = travel * depth + (x - view.offsetX) / view.scale;
@@ -408,7 +381,7 @@
     const width = spec.width * (0.92 + broadPulse + secondaryPulse * 0.45);
     const height = spec.height * (0.88 + secondaryPulse + Math.sin(time * 0.29 + spec.phase * 0.4) * activity * 0.18);
     const centerY = screenY(spec.y + Math.sin(time * 0.15 + spec.phase) * (1.2 + activity * 4));
-    const pointCount = 46;
+    const pointCount = fastRender ? 28 : 46;
     const points = [];
 
     for (let index = 0; index < pointCount; index += 1) {
@@ -469,7 +442,7 @@
     const softness = (layer.blur + (1 - detail) * (layer.foreground ? 2.9 : 2.2)) * view.scale;
     const contour = [];
 
-    const contourStep = Math.max(8, layer.contourStep * view.scale);
+    const contourStep = Math.max(fastRender ? 13 : 8, layer.contourStep * view.scale * (fastRender ? 1.42 : 1));
     for (let x = -contourStep * 3; x <= view.width + contourStep * 3; x += contourStep) {
       const worldX = travel * depth + (x - view.offsetX) / view.scale;
       const broad = smoothNoise(worldX, layer.seed + 21, layer.foreground ? 245 : 205) - 0.5;
@@ -485,7 +458,7 @@
     }
 
     context.save();
-    context.filter = "blur(" + softness + "px)";
+    context.filter = "blur(" + (softness * (fastRender ? 0.72 : 1)) + "px)";
     context.globalAlpha = layer.opacity;
     context.beginPath();
     context.moveTo(contour[0].x, contour[0].y);
@@ -509,6 +482,7 @@
     context.filter = "blur(" + ((layer.foreground ? 2.8 : 0.9) + (1 - detail) * 1.4) * view.scale + "px)";
     for (let index = first; index <= last; index += 1) {
       const seed = layer.seed + index * 8191;
+      if (fastRender && randomAt(seed + 211) < 0.24) continue;
       const skipChance = layer.foreground ? 0.04 + (1 - density) * 0.28 : 0.02 + (1 - density) * 0.13;
       if (randomAt(seed + 41) < skipChance) continue;
       const worldX = index * spacing + (randomAt(seed + 1) - 0.5) * spacing * 0.88;
@@ -517,7 +491,7 @@
       const base = layer.baseline + (randomAt(seed + 6) - 0.5) * layer.baseJitter * 1.6;
       const centerY = base - height * (0.48 + randomAt(seed + 7) * 0.2);
       const points = [];
-      const pointCount = Math.round(15 + detail * 9);
+      const pointCount = Math.max(9, Math.round((15 + detail * 9) * (fastRender ? 0.64 : 1)));
       const localPhase = randomAt(seed + 13) * Math.PI * 2;
       for (let point = 0; point < pointCount; point += 1) {
         const angle = (Math.PI * 2 * point) / pointCount;
@@ -542,7 +516,7 @@
       context.filter = "blur(" + ((1.8 + (1 - detail) * 1.5) * view.scale) + "px)";
       for (let index = first; index <= last; index += 1) {
         const seed = layer.seed + index * 8191;
-        if (randomAt(seed + 101) > 0.18 + detail * 0.42) continue;
+        if (randomAt(seed + 101) > (fastRender ? 0.12 + detail * 0.22 : 0.18 + detail * 0.42)) continue;
         const worldX = index * spacing + (randomAt(seed + 1) - 0.5) * spacing;
         const x = screenX(worldX, depth, travel);
         const y = screenY(layer.baseline - layer.height * (0.45 + randomAt(seed + 3) * 0.34));
@@ -623,8 +597,9 @@
         context.globalAlpha *= 0.82;
         context.lineWidth = Math.max(0.4, 0.53 * view.scale);
         context.beginPath();
-        for (let hanger = 1; hanger < 9; hanger += 1) {
-          const ratio = hanger / 9;
+        const hangerCount = fastRender ? 6 : 9;
+        for (let hanger = 1; hanger < hangerCount; hanger += 1) {
+          const ratio = hanger / hangerCount;
           const x = leftX + (rightX - leftX) * ratio;
           const y = towerY * (1 - ratio) * (1 - ratio) + cableMidY * 2 * ratio * (1 - ratio) + towerY * ratio * ratio;
           context.moveTo(x, y);
@@ -753,8 +728,9 @@
     context.save();
     context.translate(targetBaseX, y + 1.1 * view.scale);
     context.scale(-trainScale * view.scale, trainScale * view.scale);
-    context.filter = "blur(7px)";
-    for (let puff = 0; puff < 9; puff += 1) {
+    context.filter = "blur(" + (fastRender ? 4.5 : 7) + "px)";
+    const puffCount = fastRender ? 5 : 9;
+    for (let puff = 0; puff < puffCount; puff += 1) {
       const cycle = ((elapsed * 23 - puff * 19) % 220 + 220) % 220;
       const age = cycle / 220;
       const radius = 15 + age * 27 + Math.sin(elapsed * 1.2 + puff) * 2.2;
@@ -830,7 +806,13 @@
   }
 
   controls.forEach((input) => {
+    input.addEventListener("pointerdown", markControlInteraction, { passive: true });
+    input.addEventListener("pointerup", releaseControlInteraction, { passive: true });
+    input.addEventListener("pointercancel", releaseControlInteraction, { passive: true });
+    input.addEventListener("keydown", markControlInteraction, { passive: true });
+    input.addEventListener("keyup", releaseControlInteraction, { passive: true });
     input.addEventListener("input", () => {
+      markControlInteraction();
       updateInput(input);
       if (reduced) drawFrame(elapsed);
     });
@@ -846,10 +828,10 @@
     visible = document.visibilityState === "visible";
     if (visible) {
       startAnimation();
-      if (audioUnlocked) scheduleNextRumble(false);
+      if (audioUnlocked) scheduleNextWhistle(false);
     } else {
       stopAnimation();
-      stopRumbleForHiddenPage();
+      stopWhistleForHiddenPage();
     }
   });
 

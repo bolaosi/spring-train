@@ -29,15 +29,12 @@ with sync_playwright() as playwright:
     page.on("console", lambda message: report["errors"].append(message.text) if message.type == "error" else None)
     page.on("request", lambda request: report["resources"].append(request.url))
     page.add_init_script("""(() => {
-      window.__createdRumbleOscillators = 0;
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (AudioContextClass) {
-        const original = AudioContextClass.prototype.createOscillator;
-        AudioContextClass.prototype.createOscillator = function (...args) {
-          window.__createdRumbleOscillators += 1;
-          return original.apply(this, args);
-        };
-      }
+      window.__whistlePlayCalls = 0;
+      const originalPlay = HTMLMediaElement.prototype.play;
+      HTMLMediaElement.prototype.play = function (...args) {
+        if (this.id === "train-whistle") window.__whistlePlayCalls += 1;
+        return originalPlay.apply(this, args);
+      };
     })();""")
     page.goto(root.joinpath("index.html").as_uri())
     page.wait_for_timeout(120)
@@ -45,11 +42,13 @@ with sync_playwright() as playwright:
     report["directFile"] = page.title()
     assert page.locator("#landscape").count() == 1
     assert page.locator("input[type=range]").count() == 8
-    assert page.locator("audio").count() == 1
+    assert page.locator("audio").count() == 2
     assert page.locator("video, img").count() == 0
     assert page.locator("#background-music").get_attribute("loop") is not None
     assert page.locator("#background-music").get_attribute("autoplay") is not None
     assert page.locator("#background-music").get_attribute("src") == "./Outer%20Wilds.mp3"
+    assert page.locator("#train-whistle").get_attribute("src") == "./%E7%81%AB%E8%BD%A6%E9%B8%A3%E7%AC%9B%E5%A3%B0.mp3"
+    assert page.locator("#train-whistle").get_attribute("loop") is None
     assert page.locator("h1").inner_text() == "场景参数"
     assert page.locator(".parameter-panel").inner_text().find("恢复默认") >= 0
 
@@ -135,11 +134,13 @@ with sync_playwright() as playwright:
     # Any ordinary interaction unlocks the bundled music and intermittent train sound.
     page.mouse.click(100, 100)
     page.wait_for_function("document.querySelector('#audio-status').textContent.includes('环境声已开启')", timeout=5000)
-    page.wait_for_function("window.__createdRumbleOscillators >= 3", timeout=16000)
+    page.wait_for_function("window.__whistlePlayCalls >= 1", timeout=9000)
     report["audio"] = {
         "bundledLoop": True,
         "statusAfterInteraction": page.locator("#audio-status").inner_text(),
-        "rumbleOscillatorsCreated": page.evaluate("window.__createdRumbleOscillators"),
+        "whistlePlayCalls": page.evaluate("window.__whistlePlayCalls"),
+        "backgroundVolume": page.locator("#background-music").evaluate("audio => audio.volume"),
+        "backgroundDuckDisabled": True,
         "autoplayFallback": True,
     }
 
