@@ -4,6 +4,8 @@
   const SCENE_WIDTH = 1252;
   const SCENE_HEIGHT = 576;
   const SKYLINE = 118;
+  const MUSIC_VOLUME = 0.18;
+  const MUSIC_DUCK_GAIN = 0.08;
   const canvas = document.getElementById("landscape");
   const context = canvas.getContext("2d", { alpha: false, desynchronized: true });
   const controls = Array.from(document.querySelectorAll("[data-param]"));
@@ -71,7 +73,8 @@
     musicSource.connect(musicGain);
     musicGain.connect(audioContext.destination);
     trainRumbleBus = audioContext.createGain();
-    trainRumbleBus.gain.value = 0.78;
+    // Keep the rumble clearly above the quieter ambience without hard clipping.
+    trainRumbleBus.gain.value = 1.08;
     trainRumbleBus.connect(audioContext.destination);
   }
 
@@ -126,7 +129,9 @@
   function scheduleNextRumble(firstEvent) {
     if (!audioUnlocked || !visible) return;
     if (rumbleTimer) window.clearTimeout(rumbleTimer);
-    const delay = firstEvent ? 6500 + Math.random() * 7500 : 22000 + Math.random() * 26000;
+    // Let the first event arrive soon enough to be heard during a normal
+    // preview, then return to a less predictable longer interval.
+    const delay = firstEvent ? 2200 + Math.random() * 1800 : 14000 + Math.random() * 14000;
     rumbleTimer = window.setTimeout(() => {
       rumbleTimer = 0;
       playTrainRumble();
@@ -137,19 +142,19 @@
   function playTrainRumble() {
     if (!audioUnlocked || !audioContext || !trainRumbleBus || !visible) return;
     const now = audioContext.currentTime;
-    const duration = 4.2 + Math.random() * 3.1;
+    const duration = 4.8 + Math.random() * 2.8;
     const end = now + duration;
     const eventGain = audioContext.createGain();
     eventGain.gain.setValueAtTime(0.0001, now);
-    eventGain.gain.exponentialRampToValueAtTime(0.48 + Math.random() * 0.12, now + 0.72);
-    eventGain.gain.setTargetAtTime(0.36 + Math.random() * 0.12, now + 0.74, 0.5);
+    eventGain.gain.exponentialRampToValueAtTime(0.68 + Math.random() * 0.12, now + 0.58);
+    eventGain.gain.setTargetAtTime(0.52 + Math.random() * 0.12, now + 0.62, 0.5);
     eventGain.gain.setTargetAtTime(0.0001, end - 1.1, 0.55);
     eventGain.connect(trainRumbleBus);
 
     const lowPass = audioContext.createBiquadFilter();
     lowPass.type = "lowpass";
-    lowPass.frequency.value = 150 + Math.random() * 55;
-    lowPass.Q.value = 0.72;
+    lowPass.frequency.value = 190 + Math.random() * 70;
+    lowPass.Q.value = 0.82;
     lowPass.connect(eventGain);
 
     const oscillators = [];
@@ -157,7 +162,7 @@
     mainTone.type = "sawtooth";
     mainTone.frequency.setValueAtTime(31 + Math.random() * 8, now);
     const mainToneGain = audioContext.createGain();
-    mainToneGain.gain.value = 0.2;
+    mainToneGain.gain.value = 0.3;
     mainTone.connect(mainToneGain).connect(lowPass);
     mainTone.start(now);
     mainTone.stop(end);
@@ -167,7 +172,7 @@
     harmonic.type = "triangle";
     harmonic.frequency.setValueAtTime(63 + Math.random() * 14, now);
     const harmonicGain = audioContext.createGain();
-    harmonicGain.gain.value = 0.14;
+    harmonicGain.gain.value = 0.2;
     harmonic.connect(harmonicGain).connect(lowPass);
     harmonic.start(now);
     harmonic.stop(end);
@@ -177,11 +182,23 @@
     subTone.type = "sine";
     subTone.frequency.setValueAtTime(24 + Math.random() * 6, now);
     const subGain = audioContext.createGain();
-    subGain.gain.value = 0.23;
+    subGain.gain.value = 0.28;
     subTone.connect(subGain).connect(eventGain);
     subTone.start(now);
     subTone.stop(end);
     oscillators.push(subTone);
+
+    // A low-mid mechanical layer makes the event readable on small speakers;
+    // the deeper tones above still provide the distant steam-train weight.
+    const presenceTone = audioContext.createOscillator();
+    presenceTone.type = "triangle";
+    presenceTone.frequency.setValueAtTime(96 + Math.random() * 18, now);
+    const presenceGain = audioContext.createGain();
+    presenceGain.gain.value = 0.18;
+    presenceTone.connect(presenceGain).connect(lowPass);
+    presenceTone.start(now);
+    presenceTone.stop(end);
+    oscillators.push(presenceTone);
 
     const sampleCount = Math.ceil(audioContext.sampleRate * 2);
     const noiseBuffer = audioContext.createBuffer(1, sampleCount, audioContext.sampleRate);
@@ -192,9 +209,9 @@
     noise.loop = true;
     const noiseFilter = audioContext.createBiquadFilter();
     noiseFilter.type = "lowpass";
-    noiseFilter.frequency.value = 190 + Math.random() * 70;
+    noiseFilter.frequency.value = 240 + Math.random() * 90;
     const noiseGain = audioContext.createGain();
-    noiseGain.gain.value = 0.12;
+    noiseGain.gain.value = 0.18;
     noise.connect(noiseFilter).connect(noiseGain).connect(eventGain);
     noise.start(now);
     noise.stop(end);
@@ -204,7 +221,7 @@
     // rumble reads clearly without muting the ambience entirely.
     musicGain.gain.cancelScheduledValues(now);
     musicGain.gain.setValueAtTime(musicGain.gain.value, now);
-    musicGain.gain.linearRampToValueAtTime(0.15, now + 0.55);
+    musicGain.gain.linearRampToValueAtTime(MUSIC_DUCK_GAIN, now + 0.55);
     musicGain.gain.setTargetAtTime(1, end - 0.45, 0.42);
 
     activeRumble = { eventGain, oscillators };
@@ -233,7 +250,7 @@
   }
 
   if (backgroundMusic) {
-    backgroundMusic.volume = 0.3;
+    backgroundMusic.volume = MUSIC_VOLUME;
     backgroundMusic.addEventListener("error", () => setAudioStatus("背景音乐文件无法读取", false));
     const autoplayAttempt = backgroundMusic.play();
     if (autoplayAttempt && typeof autoplayAttempt.then === "function") {

@@ -99,9 +99,9 @@
         390
       ],
       "panel": [
-        588,
+        576,
         73.90625,
-        830,
+        818,
         316.09375
       ],
       "controlsInsidePanel": true
@@ -141,9 +141,9 @@
         375
       ],
       "panel": [
-        459.578125,
+        447.578125,
         66.40625,
-        653,
+        641,
         308.59375
       ],
       "controlsInsidePanel": true
@@ -209,7 +209,7 @@
   "audio": {
     "bundledLoop": true,
     "statusAfterInteraction": "环境声已开启 · 火车声间歇出现",
-    "rumbleOscillatorsCreated": 3,
+    "rumbleOscillatorsCreated": 4,
     "autoplayFallback": true
   },
   "externalRequests": []
