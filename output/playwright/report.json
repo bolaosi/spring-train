@@ -3,6 +3,27 @@
   "layouts": [
     {
       "viewport": [
+        1252,
+        576
+      ],
+      "scroll": [
+        1252,
+        576
+      ],
+      "experience": [
+        1252,
+        576
+      ],
+      "panel": [
+        996,
+        166.90625,
+        1238,
+        409.09375
+      ],
+      "controlsInsidePanel": true
+    },
+    {
+      "viewport": [
         1600,
         900
       ],
@@ -10,18 +31,17 @@
         1600,
         900
       ],
-      "panel": [
-        1232,
-        192.6796875,
-        1576,
-        707.3203125
+      "experience": [
+        1600,
+        900
       ],
-      "button": [
-        1473,
-        657.3203125,
-        1552,
-        689.3203125
-      ]
+      "panel": [
+        1348,
+        265.5,
+        1596,
+        634.5
+      ],
+      "controlsInsidePanel": true
     },
     {
       "viewport": [
@@ -32,18 +52,17 @@
         1280,
         720
       ],
-      "panel": [
-        912,
-        102.6796875,
-        1256,
-        617.3203125
+      "experience": [
+        1280,
+        720
       ],
-      "button": [
-        1153,
-        567.3203125,
-        1232,
-        599.3203125
-      ]
+      "panel": [
+        1028,
+        175.5,
+        1276,
+        544.5
+      ],
+      "controlsInsidePanel": true
     },
     {
       "viewport": [
@@ -54,40 +73,17 @@
         390,
         844
       ],
-      "panel": [
-        12,
-        474.25,
-        378,
-        832
-      ],
-      "button": [
-        283,
-        788,
-        362,
-        820
-      ]
-    },
-    {
-      "viewport": [
-        320,
-        568
-      ],
-      "scroll": [
-        320,
-        568
+      "experience": [
+        390,
+        844
       ],
       "panel": [
-        8,
-        277.25,
-        312,
-        560
+        9,
+        541.609375,
+        381,
+        835
       ],
-      "button": [
-        222,
-        518,
-        301,
-        550
-      ]
+      "controlsInsidePanel": true
     },
     {
       "viewport": [
@@ -98,18 +94,38 @@
         844,
         390
       ],
-      "panel": [
-        502,
-        44.453125,
-        832,
-        345.546875
+      "experience": [
+        844,
+        390
       ],
-      "button": [
-        740,
-        308.546875,
-        817,
-        335.546875
-      ]
+      "panel": [
+        576,
+        73.90625,
+        818,
+        316.09375
+      ],
+      "controlsInsidePanel": true
+    },
+    {
+      "viewport": [
+        320,
+        568
+      ],
+      "scroll": [
+        320,
+        568
+      ],
+      "experience": [
+        320,
+        568
+      ],
+      "panel": [
+        6,
+        321,
+        314,
+        562
+      ],
+      "controlsInsidePanel": true
     },
     {
       "viewport": [
@@ -120,72 +136,115 @@
         667,
         375
       ],
-      "panel": [
-        341.515625,
-        36.953125,
-        655,
-        338.046875
+      "experience": [
+        667,
+        375
       ],
-      "button": [
-        563,
-        301.046875,
-        640,
-        328.046875
-      ]
+      "panel": [
+        447.578125,
+        66.40625,
+        641,
+        308.59375
+      ],
+      "controlsInsidePanel": true
     }
   ],
   "parameters": {
     "zoom": {
-      "changed": true,
-      "output": "1.18×"
+      "minimum": "0.82",
+      "maximum": "1.28",
+      "sceneChanged": true,
+      "ariaValueText": "1.28×"
     },
     "height": {
-      "changed": true,
-      "output": "+70 px"
+      "minimum": "-84",
+      "maximum": "84",
+      "sceneChanged": true,
+      "ariaValueText": "+84 px"
     },
     "clouds": {
-      "changed": true,
-      "output": "1.40×"
+      "minimum": "0",
+      "maximum": "1.8",
+      "sceneChanged": true,
+      "ariaValueText": "1.80×"
     },
     "mountains": {
-      "changed": true,
-      "output": "120%"
+      "minimum": "0",
+      "maximum": "1.6",
+      "sceneChanged": true,
+      "ariaValueText": "100%"
     },
     "canopy": {
-      "changed": true,
-      "output": "140%"
+      "minimum": "0.58",
+      "maximum": "1.55",
+      "sceneChanged": true,
+      "ariaValueText": "100%"
     },
     "detail": {
-      "changed": true,
-      "output": "140%"
+      "minimum": "0",
+      "maximum": "1.4",
+      "sceneChanged": true,
+      "ariaValueText": "100%"
     },
     "exposure": {
-      "changed": true,
-      "output": "1.24×"
-    },
-    "speed-0.2": {
-      "animated": true
-    },
-    "speed-1.8": {
-      "animated": true
+      "low": "brightness(0.74) contrast(0.94) saturate(0.94)",
+      "high": "brightness(1.3) contrast(1.1) saturate(1.08)",
+      "sceneChanged": true
     }
   },
-  "directFile": "春野 · 一幅正在生长的山林",
-  "keyboard": {
-    "before": "0.76",
-    "after": "0.77"
-  },
-  "exposureRendered": [
-    "brightness(0.78)",
-    "brightness(1.24)"
+  "resources": [
+    "file:///D:/Users/33904/Documents/ChatGPT/test/spring-landscape/app.js",
+    "file:///D:/Users/33904/Documents/ChatGPT/test/spring-landscape/index.html",
+    "file:///D:/Users/33904/Documents/ChatGPT/test/spring-landscape/styles.css"
   ],
+  "directFile": "春野 · 山林穿行",
+  "keyboard": {
+    "before": 1.05,
+    "after": 1.06,
+    "sliderCount": 8
+  },
+  "resetDefaults": true,
   "reducedMotionStatic": true,
-  "automaticMotion": true,
-  "performance": {
-    "frames": 94,
-    "averageCostMs": 1.8000000002298584,
-    "p95CostMs": 4.100000001490116,
-    "medianFrameMs": 16.700000000000273,
-    "p95FrameMs": 49.99999999999977
+  "externalRequests": [],
+  "animation": {
+    "automaticMotion": true,
+    "automaticSampleMs": 900,
+    "viewport": [
+      1252,
+      576
+    ],
+    "speedSampleMs": 800,
+    "slow": {
+      "value": 0.2,
+      "changedSamples": 15308
+    },
+    "fast": {
+      "value": 1.8,
+      "changedSamples": 78603
+    },
+    "fasterHasGreaterChange": true
+  },
+  "edgeCompatibility": {
+    "version": "152.0.4191.53",
+    "fileUrlCanvasRendered": true,
+    "forestSampleRgba": [
+      82,
+      144,
+      90,
+      255
+    ],
+    "pageErrors": 0,
+    "staticFallbackWhenJavaScriptDisabled": true,
+    "staticNoticeShown": true,
+    "smallViewport": [
+      320,
+      568
+    ],
+    "smallViewportScroll": [
+      320,
+      568
+    ],
+    "panelContained": true,
+    "fallbackScreenshot": "output/playwright/no-script-fallback-320x568.png"
   }
 }

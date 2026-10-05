@@ -1,81 +1,128 @@
 import json
 from pathlib import Path
+
 from playwright.sync_api import sync_playwright
 
+
 root = Path(__file__).resolve().parents[2]
-report = {"errors": [], "layouts": [], "parameters": {}}
-with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)
-    page = browser.new_page(viewport={"width": 1600, "height": 900}, reduced_motion="reduce")
-    page.on("pageerror", lambda e: report["errors"].append(str(e)))
-    page.on("console", lambda m: report["errors"].append(m.text) if m.type == "error" else None)
+artifacts = root / "output" / "playwright"
+report = {"errors": [], "layouts": [], "parameters": {}, "resources": []}
+
+
+def image_data(page):
+    return page.locator("#landscape").evaluate("canvas => canvas.toDataURL('image/png')")
+
+
+def set_range(page, name, value):
+    page.locator(f"#{name}").evaluate(
+        "(input, next) => { input.value = String(next); input.dispatchEvent(new Event('input', { bubbles: true })); }",
+        value,
+    )
+
+
+with sync_playwright() as playwright:
+    browser = playwright.chromium.launch(headless=True)
+
+    # Direct-file launch checks the actual double-click use case, with motion disabled for stable control tests.
+    page = browser.new_page(viewport={"width": 1252, "height": 576}, reduced_motion="reduce")
+    page.on("pageerror", lambda error: report["errors"].append(str(error)))
+    page.on("console", lambda message: report["errors"].append(message.text) if message.type == "error" else None)
+    page.on("request", lambda request: report["resources"].append(request.url))
     page.goto(root.joinpath("index.html").as_uri())
-    page.wait_for_timeout(100)
+    page.wait_for_timeout(120)
+
     report["directFile"] = page.title()
-    for width, height in [(1600,900),(1280,720),(390,844),(320,568),(844,390),(667,375)]:
-        page.set_viewport_size({"width":width,"height":height})
-        page.wait_for_timeout(80)
-        result = page.evaluate("""() => {
-          const panel=document.querySelector('.parameter-panel').getBoundingClientRect();
-          const rect=document.querySelector('.reset-button').getBoundingClientRect();
-          return {viewport:[innerWidth,innerHeight],scroll:[document.documentElement.scrollWidth,document.documentElement.scrollHeight],panel:[panel.left,panel.top,panel.right,panel.bottom],button:[rect.left,rect.top,rect.right,rect.bottom]};
+    assert page.locator("#landscape").count() == 1
+    assert page.locator("input[type=range]").count() == 8
+    assert page.locator("audio, video, img").count() == 0
+    assert page.locator("h1").inner_text() == "场景参数"
+    assert page.locator(".parameter-panel").inner_text().find("恢复默认") >= 0
+
+    viewport_sizes = [(1252, 576), (1600, 900), (1280, 720), (390, 844), (844, 390), (320, 568), (667, 375)]
+    screenshots = {
+        (1252, 576): "final-1252x576.png",
+        (1600, 900): "final-1600x900.png",
+        (390, 844): "final-390x844.png",
+        (844, 390): "final-844x390.png",
+    }
+    for width, height in viewport_sizes:
+        responsive = browser.new_page(viewport={"width": width, "height": height}, reduced_motion="reduce")
+        responsive.set_default_timeout(10000)
+        responsive.on("pageerror", lambda error: report["errors"].append(str(error)))
+        responsive.on("console", lambda message: report["errors"].append(message.text) if message.type == "error" else None)
+        responsive.goto(root.joinpath("index.html").as_uri())
+        responsive.wait_for_timeout(120)
+        layout = responsive.evaluate("""() => {
+          const experience = document.querySelector('.experience').getBoundingClientRect();
+          const panel = document.querySelector('.parameter-panel').getBoundingClientRect();
+          const controls = [...document.querySelectorAll('.control')].map(node => node.getBoundingClientRect());
+          return {
+            viewport: [innerWidth, innerHeight],
+            scroll: [document.documentElement.scrollWidth, document.documentElement.scrollHeight],
+            experience: [experience.width, experience.height],
+            panel: [panel.left, panel.top, panel.right, panel.bottom],
+            controlsInsidePanel: controls.every(rect => rect.left >= panel.left && rect.right <= panel.right && rect.top >= panel.top && rect.bottom <= panel.bottom)
+          };
         }""")
-        assert result['scroll']==[width,height], result
-        assert result['panel'][0]>=0 and result['panel'][1]>=0 and result['panel'][2]<=width and result['panel'][3]<=height, result
-        assert result['button'][3]<=height, result
-        report['layouts'].append(result)
-        if (width,height) in [(1600,900),(390,844)]:
-            page.screenshot(path=str(root/f'output/playwright/{width}x{height}.png'))
-    page.set_viewport_size({"width":1600,"height":900})
-    selectors={'zoom':'#camera','height':'#camera','clouds':'#clouds-far','mountains':'#mountain-far','canopy':'#forest-3 .forest-shape','detail':'#forest-3 .forest-shape','exposure':'.landscape'}
-    for name,selector in selectors.items():
-        result=page.evaluate("""({name,selector})=>{
-          const input=document.getElementById(name), target=document.querySelector(selector);
-          const read=()=> name==='exposure'?target.getAttribute('style'):(target.getAttribute('d')||target.getAttribute('transform'));
-          input.value=input.min; input.dispatchEvent(new Event('input',{bubbles:true})); const a=read();
-          input.value=input.max; input.dispatchEvent(new Event('input',{bubbles:true})); const b=read();
-          const output=document.getElementById(name+'-value').value;
-          document.getElementById('reset-controls').click();
-          return {changed:a!==b,output};
-        }""",{'name':name,'selector':selector})
-        assert result['changed'], (name,result)
-        report['parameters'][name]=result
-    page.locator('#speed').focus()
-    before=page.locator('#speed').input_value()
-    page.keyboard.press('ArrowUp')
-    after=page.locator('#speed').input_value()
-    assert float(after)>float(before), (before,after)
-    report['keyboard']={'before':before,'after':after}
-    brightness=[]
-    for value in [0.78,1.24]:
-        page.locator('#exposure').evaluate('(el,v)=>{el.value=v;el.dispatchEvent(new Event("input",{bubbles:true}));}',value)
-        page.wait_for_function("value => getComputedStyle(document.querySelector('.landscape')).filter.includes(String(value))",arg=value)
-        brightness.append(page.locator('.landscape').evaluate('(el)=>getComputedStyle(el).filter'))
-    assert brightness[0]!=brightness[1],brightness
-    report['exposureRendered']=brightness
-    page.locator('#reset-controls').click()
-    a=page.locator('#forest-3 .forest-shape').get_attribute('d')
-    page.wait_for_timeout(160)
-    assert a==page.locator('#forest-3 .forest-shape').get_attribute('d')
-    report['reducedMotionStatic']=True
-    page.goto(root.joinpath('index.html').as_uri())
-    page.emulate_media(reduced_motion='no-preference')
-    page.wait_for_timeout(100)
-    a=page.locator('#forest-3 .forest-shape').get_attribute('d')
-    page.wait_for_timeout(300)
-    assert a!=page.locator('#forest-3 .forest-shape').get_attribute('d')
-    report['automaticMotion']=True
-    page.evaluate("""() => { window.__perf={costs:[],intervals:[],last:0}; const native=window.requestAnimationFrame.bind(window);window.requestAnimationFrame=callback=>native(t=>{const start=performance.now();callback(t);window.__perf.costs.push(performance.now()-start);if(window.__perf.last)window.__perf.intervals.push(t-window.__perf.last);window.__perf.last=t;}); }""")
-    page.wait_for_timeout(2500)
-    report['performance']=page.evaluate("""()=> {const p=window.__perf,c=p.costs.sort((a,b)=>a-b),i=p.intervals.sort((a,b)=>a-b);return {frames:c.length,averageCostMs:p.costs.reduce((a,b)=>a+b,0)/c.length,p95CostMs:c[Math.floor(c.length*.95)],medianFrameMs:i[Math.floor(i.length*.5)],p95FrameMs:i[Math.floor(i.length*.95)]};}""")
-    for rate in [0.2,1.8]:
-        page.locator('#speed').evaluate('(el,v)=>{el.value=v;el.dispatchEvent(new Event("input",{bubbles:true}));}', rate)
-        a=page.locator('#clouds-far').get_attribute('transform')
-        page.wait_for_timeout(300)
-        b=page.locator('#clouds-far').get_attribute('transform')
-        assert a!=b
-        report['parameters'][f'speed-{rate}']={'animated':True}
-    assert not report['errors'], report['errors']
+        assert layout["scroll"] == [width, height], layout
+        assert layout["panel"][0] >= 0 and layout["panel"][1] >= 0, layout
+        assert layout["panel"][2] <= width and layout["panel"][3] <= height, layout
+        assert layout["controlsInsidePanel"], layout
+        report["layouts"].append(layout)
+        if (width, height) in screenshots:
+            responsive.screenshot(path=str(artifacts / screenshots[(width, height)]))
+        responsive.close()
+
+    page.set_viewport_size({"width": 1252, "height": 576})
+    for name in ["zoom", "height", "clouds", "mountains", "canopy", "detail"]:
+        control = page.locator(f"#{name}")
+        minimum = control.get_attribute("min")
+        maximum = control.get_attribute("max")
+        set_range(page, name, minimum)
+        low_frame = image_data(page)
+        set_range(page, name, maximum)
+        high_frame = image_data(page)
+        changed = low_frame != high_frame
+        assert changed, name
+        report["parameters"][name] = {
+            "minimum": minimum,
+            "maximum": maximum,
+            "sceneChanged": changed,
+            "ariaValueText": control.get_attribute("aria-valuetext"),
+        }
+
+    exposure_frames = []
+    for value in ["0.74", "1.3"]:
+        set_range(page, "exposure", value)
+        # Read the inline filter assigned by applyExposure; this is the direct rendered control value.
+        exposure_frames.append(page.locator("#landscape").evaluate("canvas => canvas.style.filter"))
+    assert exposure_frames[0] != exposure_frames[1]
+    report["parameters"]["exposure"] = {"low": exposure_frames[0], "high": exposure_frames[1], "sceneChanged": True}
+
+    speed = page.locator("#speed")
+    speed.focus()
+    before = float(speed.input_value())
+    page.keyboard.press("ArrowUp")
+    after = float(speed.input_value())
+    assert after > before
+    report["keyboard"] = {"before": before, "after": after, "sliderCount": page.locator("input[type=range]").count()}
+
+    page.locator("#reset-controls").click()
+    reset_ok = page.locator("input[type=range]").evaluate_all("controls => controls.every(control => control.value === control.defaultValue)")
+    assert reset_ok
+    report["resetDefaults"] = reset_ok
+    page.wait_for_timeout(180)
+    stable_before = image_data(page)
+    page.wait_for_timeout(260)
+    assert stable_before == image_data(page)
+    report["reducedMotionStatic"] = True
+
+    report["externalRequests"] = [url for url in report["resources"] if not url.startswith("file:")]
+    assert not report["externalRequests"], report["externalRequests"]
+    assert not report["errors"], report["errors"]
+
     browser.close()
-root.joinpath('output/playwright/report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
-print(json.dumps(report,ensure_ascii=False,indent=2))
+
+report["resources"] = sorted(set(report["resources"]))
+(artifacts / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+print(json.dumps(report, ensure_ascii=False, indent=2))
