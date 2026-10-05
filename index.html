@@ -12,6 +12,7 @@
   </head>
   <body>
     <main class="experience" id="experience" aria-label="摄像机穿行中的春日山林">
+      <audio id="background-music" src="./Outer%20Wilds.mp3" autoplay loop preload="auto" aria-hidden="true"></audio>
       <div class="landscape-stage" aria-hidden="true">
         <svg class="landscape-fallback" viewBox="0 0 1252 576" preserveAspectRatio="xMidYMid slice" focusable="false" aria-hidden="true">
           <defs>
@@ -123,7 +124,7 @@
         </form>
 
         <footer class="panel-footer">
-          <span class="panel-hint">DRAG TO SHAPE THE VIEW</span>
+          <span class="audio-status" id="audio-status" aria-live="polite">交互开启环境声</span>
           <button class="reset-button" id="reset-controls" type="button">
             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M4.2 7.1A6.2 6.2 0 1 1 4 12.4M4.2 3.8v3.7h3.7"></path></svg>
             <span>恢复默认</span>

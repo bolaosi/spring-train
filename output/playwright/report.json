@@ -15,9 +15,9 @@
         576
       ],
       "panel": [
-        984,
+        996,
         166.90625,
-        1226,
+        1238,
         409.09375
       ],
       "controlsInsidePanel": true
@@ -36,9 +36,9 @@
         900
       ],
       "panel": [
-        1348,
+        1336,
         265.5,
-        1596,
+        1584,
         634.5
       ],
       "controlsInsidePanel": true
@@ -57,9 +57,9 @@
         720
       ],
       "panel": [
-        1028,
+        1016,
         175.5,
-        1276,
+        1264,
         544.5
       ],
       "controlsInsidePanel": true
@@ -193,9 +193,10 @@
     }
   },
   "resources": [
-    "file:///D:/Users/33904/Documents/ChatGPT/test/spring-landscape/app.js",
-    "file:///D:/Users/33904/Documents/ChatGPT/test/spring-landscape/index.html",
-    "file:///D:/Users/33904/Documents/ChatGPT/test/spring-landscape/styles.css"
+    "file:///D:/shortcut/word/%E5%88%9B%E4%BD%9C%E5%8C%BA/spring-train/spring-train/Outer%20Wilds.mp3",
+    "file:///D:/shortcut/word/%E5%88%9B%E4%BD%9C%E5%8C%BA/spring-train/spring-train/app.js",
+    "file:///D:/shortcut/word/%E5%88%9B%E4%BD%9C%E5%8C%BA/spring-train/spring-train/index.html",
+    "file:///D:/shortcut/word/%E5%88%9B%E4%BD%9C%E5%8C%BA/spring-train/spring-train/styles.css"
   ],
   "directFile": "春野 · 山林穿行",
   "keyboard": {
@@ -205,5 +206,11 @@
   },
   "resetDefaults": true,
   "reducedMotionStatic": true,
+  "audio": {
+    "bundledLoop": true,
+    "statusAfterInteraction": "环境声已开启 · 火车声间歇出现",
+    "rumbleOscillatorsCreated": 3,
+    "autoplayFallback": true
+  },
   "externalRequests": []
 }

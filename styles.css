@@ -149,7 +149,10 @@ input { font: inherit; }
 .control-value { color: rgba(222, 239, 194, 0.87); font-size: 8px; font-variant-numeric: tabular-nums; letter-spacing: 0; line-height: 1; white-space: nowrap; }
 
 .panel-footer { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--panel-line); }
-.panel-hint { color: rgba(239, 248, 226, 0.42); font-size: 7px; letter-spacing: 0.11em; white-space: nowrap; }
+.audio-status { display: inline-flex; min-width: 0; align-items: center; gap: 5px; color: rgba(239, 248, 226, 0.58); font-size: 8px; letter-spacing: 0.01em; white-space: nowrap; }
+.audio-status::before { width: 5px; height: 5px; flex: 0 0 auto; border-radius: 50%; background: rgba(225, 237, 204, 0.5); content: ""; }
+.audio-status.is-active { color: rgba(224, 241, 194, 0.88); }
+.audio-status.is-active::before { background: #d4eaa3; box-shadow: 0 0 8px rgba(209, 236, 164, 0.72); }
 .reset-button { display: inline-flex; min-height: 27px; align-items: center; justify-content: center; gap: 4px; padding: 4px 7px; border: 1px solid rgba(235, 245, 222, 0.19); border-radius: 999px; background: rgba(244, 250, 234, 0.055); color: rgba(245, 250, 234, 0.88); font-size: 9px; cursor: pointer; transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease; }
 .reset-button svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .reset-button:hover { border-color: rgba(234, 245, 216, 0.42); background: rgba(244, 250, 234, 0.14); }
@@ -174,7 +177,6 @@ input { font: inherit; }
   .control input[type="range"] { width: 40px; height: 51px; margin: 0; }
   .control-value { font-size: 8px; }
   .panel-footer { margin-top: 7px; padding-top: 6px; }
-  .panel-hint { font-size: 6px; }
 }
 
 @media (orientation: landscape) and (max-height: 600px) {
@@ -198,7 +200,6 @@ input { font: inherit; }
 }
 
 @media (orientation: landscape) and (max-height: 600px) and (max-width: 700px) {
-  .panel-hint { display: none; }
   .panel-footer { justify-content: flex-end; }
 }
 
@@ -212,7 +213,6 @@ input { font: inherit; }
   .control-value { font-size: 7px; }
   .control input[type="range"] { width: 36px; height: 42px; }
   .panel-footer { margin-top: 4px; padding-top: 4px; }
-  .panel-hint { display: none; }
 }
 
 @keyframes panel-arrive-mobile { from { opacity: 0; } to { opacity: 1; } }

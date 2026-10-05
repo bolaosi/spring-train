@@ -8,6 +8,8 @@
   const context = canvas.getContext("2d", { alpha: false, desynchronized: true });
   const controls = Array.from(document.querySelectorAll("[data-param]"));
   const resetButton = document.getElementById("reset-controls");
+  const backgroundMusic = document.getElementById("background-music");
+  const audioStatus = document.getElementById("audio-status");
   const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
 
   const settings = {
@@ -40,9 +42,210 @@
   let frameHandle = 0;
   let visible = document.visibilityState === "visible";
   let reduced = motionPreference.matches;
+  let audioContext = null;
+  let musicGain = null;
+  let trainRumbleBus = null;
+  let audioUnlocked = false;
+  let audioStarting = false;
+  let rumbleTimer = 0;
+  let rumbleEndTimer = 0;
+  let activeRumble = null;
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const unit = (value, min, max) => clamp((value - min) / (max - min), 0, 1);
+
+  function setAudioStatus(message, active) {
+    if (!audioStatus) return;
+    audioStatus.textContent = message;
+    audioStatus.classList.toggle("is-active", Boolean(active));
+  }
+
+  function createAudioGraph() {
+    if (musicGain && trainRumbleBus) return;
+    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextConstructor || !backgroundMusic) throw new Error("Web Audio is unavailable");
+    if (!audioContext) audioContext = new AudioContextConstructor();
+    const musicSource = audioContext.createMediaElementSource(backgroundMusic);
+    musicGain = audioContext.createGain();
+    musicGain.gain.value = 1;
+    musicSource.connect(musicGain);
+    musicGain.connect(audioContext.destination);
+    trainRumbleBus = audioContext.createGain();
+    trainRumbleBus.gain.value = 0.78;
+    trainRumbleBus.connect(audioContext.destination);
+  }
+
+  function activateTrainSoundAfterAutoplay() {
+    if (audioUnlocked || audioContext || !backgroundMusic) return;
+    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextConstructor) return;
+    try {
+      // If the browser permits media autoplay, also try to resume Web Audio.
+      // Do not connect the music element until resume succeeds, so a browser
+      // that still blocks Web Audio can keep the already-playing music intact.
+      audioContext = new AudioContextConstructor();
+      const context = audioContext;
+      context.resume().then(() => {
+        if (audioContext !== context || context.state !== "running") return;
+        createAudioGraph();
+        audioUnlocked = true;
+        setAudioStatus("环境声已开启 · 火车声间歇出现", true);
+        scheduleNextRumble(true);
+      }).catch(() => {
+        if (!audioUnlocked) setAudioStatus("背景音乐已播放 · 点击开启火车声", true);
+      });
+    } catch (error) {
+      // Keep media autoplay independent from Web Audio support.
+    }
+  }
+
+  function unlockAmbientSound() {
+    if (audioUnlocked || audioStarting || !backgroundMusic) return;
+    audioStarting = true;
+    try {
+      createAudioGraph();
+      // Both calls run directly inside the user gesture to satisfy autoplay
+      // policies. Any page interaction can unlock the sound; no player UI is used.
+      const resumePromise = audioContext.resume();
+      const musicPromise = backgroundMusic.play();
+      Promise.all([resumePromise, musicPromise]).then(() => {
+        audioUnlocked = true;
+        audioStarting = false;
+        setAudioStatus("环境声已开启 · 火车声间歇出现", true);
+        scheduleNextRumble(true);
+      }).catch(() => {
+        audioStarting = false;
+        setAudioStatus("点击/触摸开启声音", false);
+      });
+    } catch (error) {
+      audioStarting = false;
+      setAudioStatus("当前浏览器不支持声音", false);
+    }
+  }
+
+  function scheduleNextRumble(firstEvent) {
+    if (!audioUnlocked || !visible) return;
+    if (rumbleTimer) window.clearTimeout(rumbleTimer);
+    const delay = firstEvent ? 6500 + Math.random() * 7500 : 22000 + Math.random() * 26000;
+    rumbleTimer = window.setTimeout(() => {
+      rumbleTimer = 0;
+      playTrainRumble();
+      scheduleNextRumble(false);
+    }, delay);
+  }
+
+  function playTrainRumble() {
+    if (!audioUnlocked || !audioContext || !trainRumbleBus || !visible) return;
+    const now = audioContext.currentTime;
+    const duration = 4.2 + Math.random() * 3.1;
+    const end = now + duration;
+    const eventGain = audioContext.createGain();
+    eventGain.gain.setValueAtTime(0.0001, now);
+    eventGain.gain.exponentialRampToValueAtTime(0.48 + Math.random() * 0.12, now + 0.72);
+    eventGain.gain.setTargetAtTime(0.36 + Math.random() * 0.12, now + 0.74, 0.5);
+    eventGain.gain.setTargetAtTime(0.0001, end - 1.1, 0.55);
+    eventGain.connect(trainRumbleBus);
+
+    const lowPass = audioContext.createBiquadFilter();
+    lowPass.type = "lowpass";
+    lowPass.frequency.value = 150 + Math.random() * 55;
+    lowPass.Q.value = 0.72;
+    lowPass.connect(eventGain);
+
+    const oscillators = [];
+    const mainTone = audioContext.createOscillator();
+    mainTone.type = "sawtooth";
+    mainTone.frequency.setValueAtTime(31 + Math.random() * 8, now);
+    const mainToneGain = audioContext.createGain();
+    mainToneGain.gain.value = 0.2;
+    mainTone.connect(mainToneGain).connect(lowPass);
+    mainTone.start(now);
+    mainTone.stop(end);
+    oscillators.push(mainTone);
+
+    const harmonic = audioContext.createOscillator();
+    harmonic.type = "triangle";
+    harmonic.frequency.setValueAtTime(63 + Math.random() * 14, now);
+    const harmonicGain = audioContext.createGain();
+    harmonicGain.gain.value = 0.14;
+    harmonic.connect(harmonicGain).connect(lowPass);
+    harmonic.start(now);
+    harmonic.stop(end);
+    oscillators.push(harmonic);
+
+    const subTone = audioContext.createOscillator();
+    subTone.type = "sine";
+    subTone.frequency.setValueAtTime(24 + Math.random() * 6, now);
+    const subGain = audioContext.createGain();
+    subGain.gain.value = 0.23;
+    subTone.connect(subGain).connect(eventGain);
+    subTone.start(now);
+    subTone.stop(end);
+    oscillators.push(subTone);
+
+    const sampleCount = Math.ceil(audioContext.sampleRate * 2);
+    const noiseBuffer = audioContext.createBuffer(1, sampleCount, audioContext.sampleRate);
+    const noiseData = noiseBuffer.getChannelData(0);
+    for (let index = 0; index < sampleCount; index += 1) noiseData[index] = Math.random() * 2 - 1;
+    const noise = audioContext.createBufferSource();
+    noise.buffer = noiseBuffer;
+    noise.loop = true;
+    const noiseFilter = audioContext.createBiquadFilter();
+    noiseFilter.type = "lowpass";
+    noiseFilter.frequency.value = 190 + Math.random() * 70;
+    const noiseGain = audioContext.createGain();
+    noiseGain.gain.value = 0.12;
+    noise.connect(noiseFilter).connect(noiseGain).connect(eventGain);
+    noise.start(now);
+    noise.stop(end);
+    oscillators.push(noise);
+
+    // Briefly lower the music under the train event so its low mechanical
+    // rumble reads clearly without muting the ambience entirely.
+    musicGain.gain.cancelScheduledValues(now);
+    musicGain.gain.setValueAtTime(musicGain.gain.value, now);
+    musicGain.gain.linearRampToValueAtTime(0.15, now + 0.55);
+    musicGain.gain.setTargetAtTime(1, end - 0.45, 0.42);
+
+    activeRumble = { eventGain, oscillators };
+    oscillators.forEach((oscillator) => oscillator.addEventListener("ended", () => oscillator.disconnect(), { once: true }));
+    rumbleEndTimer = window.setTimeout(() => {
+      activeRumble = null;
+      rumbleEndTimer = 0;
+    }, duration * 1000 + 250);
+  }
+
+  function stopRumbleForHiddenPage() {
+    if (rumbleTimer) window.clearTimeout(rumbleTimer);
+    if (rumbleEndTimer) window.clearTimeout(rumbleEndTimer);
+    rumbleTimer = 0;
+    rumbleEndTimer = 0;
+    if (!audioContext || !musicGain || !activeRumble) return;
+    const now = audioContext.currentTime;
+    activeRumble.eventGain.gain.cancelScheduledValues(now);
+    activeRumble.eventGain.gain.setTargetAtTime(0.0001, now, 0.08);
+    activeRumble.oscillators.forEach((oscillator) => {
+      try { oscillator.stop(now + 0.35); } catch (error) { /* already ended */ }
+    });
+    musicGain.gain.cancelScheduledValues(now);
+    musicGain.gain.setTargetAtTime(1, now, 0.18);
+    activeRumble = null;
+  }
+
+  if (backgroundMusic) {
+    backgroundMusic.volume = 0.3;
+    backgroundMusic.addEventListener("error", () => setAudioStatus("背景音乐文件无法读取", false));
+    const autoplayAttempt = backgroundMusic.play();
+    if (autoplayAttempt && typeof autoplayAttempt.then === "function") {
+      autoplayAttempt.then(() => {
+        setAudioStatus("背景音乐正在播放", true);
+        activateTrainSoundAfterAutoplay();
+      }).catch(() => setAudioStatus("点击/触摸开启声音", false));
+    }
+    ["pointerdown", "touchstart", "keydown"].forEach((eventName) => {
+      window.addEventListener(eventName, unlockAmbientSound, { passive: true, capture: true });
+    });
+  }
 
   function randomAt(seed) {
     let value = seed | 0;
@@ -435,93 +638,119 @@
   function drawTrain() {
     const targetScreenX = view.width * 0.2;
     const targetBaseX = view.width / 2 + (targetScreenX - view.width / 2) / settings.zoom;
-    // A long, small-scale consist: the camera follows its front while the
-    // rear carriages stretch back through the landscape.
-    const trainScale = 0.235 * clamp(view.width / 850, 0.48, 1.08);
-    const trainWidth = 356 * trainScale * view.scale;
-    const x = targetBaseX - trainWidth / 2;
+    // Keep the locomotive's right-facing front buffer near the 20% follow point;
+    // the tender and long carriage consist trail to the left and leave frame.
+    const trainScale = 0.43;
+    const carriageCount = 40;
+    const carriagePitch = 66;
+    const trainWidth = 124 + carriageCount * carriagePitch;
+    const x = targetBaseX;
     const y = screenY(340 + Math.sin(elapsed * 1.75) * 0.5);
 
     context.save();
     context.translate(x, y + 1.1 * view.scale);
-    context.scale(trainScale * view.scale, trainScale * view.scale);
-
-    // Soft, rising smoke puffs identify the early steam locomotive without
-    // adding a separate image asset. The motion is continuous and fixed by
-    // elapsed time, so the puffs never jump or randomly flicker.
-    context.save();
-    context.filter = "blur(2.2px)";
-    context.fillStyle = "rgba(213, 223, 211, 0.42)";
-    for (let puff = 0; puff < 5; puff += 1) {
-      const phase = elapsed * (0.62 + puff * 0.035) + puff * 1.37;
-      const rise = (phase * 17) % 62;
-      const drift = Math.sin(phase * 0.9 + puff) * (4 + puff * 1.7);
-      const puffX = 43 + drift + puff * 2.5;
-      const puffY = -35 - rise;
-      const puffRadius = 8 + puff * 1.8 + Math.sin(phase * 1.2) * 1.5;
-      context.globalAlpha = 0.38 - puff * 0.035;
-      context.beginPath();
-      context.arc(puffX, puffY, puffRadius, 0, Math.PI * 2);
-      context.fill();
-    }
-    context.restore();
+    context.scale(-trainScale * view.scale, trainScale * view.scale);
 
     context.fillStyle = "rgba(18, 37, 31, 0.17)";
     context.beginPath();
-    context.ellipse(178, 1.5, 174, 3.4, 0, 0, Math.PI * 2);
+    context.ellipse(trainWidth / 2, 1.5, trainWidth / 2, 3.4, 0, 0, Math.PI * 2);
     context.fill();
+
+    // Local geometry is mirrored around the nose anchor, so the cowcatcher
+    // leads to the right while the boiler, cab, tender and carriages trail left.
     context.fillStyle = "#1b352d";
     context.strokeStyle = "#142b25";
-    context.lineWidth = 1.1;
+    context.lineWidth = 1.6;
     context.beginPath();
-    context.moveTo(6, -18);
-    context.lineTo(51, -18);
-    context.lineTo(61, -10);
-    context.lineTo(61, -2);
-    context.lineTo(6, -2);
+    context.moveTo(0, -6);
+    context.lineTo(11, -23);
+    context.lineTo(69, -23);
+    context.lineTo(83, -18);
+    context.lineTo(83, -5);
+    context.lineTo(0, -5);
     context.closePath();
     context.fill();
     context.stroke();
+
+    // Boiler, smokebox door, lamp and short chimney establish a classic steam
+    // locomotive silhouette at the leading end of the train.
     context.fillStyle = "#254437";
     context.beginPath();
-    context.moveTo(25, -28);
-    context.lineTo(48, -28);
-    context.lineTo(59, -18);
-    context.lineTo(25, -18);
+    context.ellipse(38, -24, 28, 9, 0, Math.PI, Math.PI * 2);
+    context.lineTo(66, -14);
+    context.lineTo(10, -14);
     context.closePath();
     context.fill();
-    context.fillStyle = "#cbdc9f";
-    context.fillRect(31, -25, 7, 6);
-    context.fillRect(43, -25, 7, 6);
     context.fillStyle = "#19332b";
-    context.fillRect(13, -26, 7, 8);
-    context.fillRect(12, -30, 9, 4);
+    context.beginPath();
+    context.arc(11, -17, 7, 0, Math.PI * 2);
+    context.fill();
+    context.fillRect(24, -39, 8, 15);
+    context.fillRect(21, -41, 14, 4);
+    context.fillRect(47, -34, 7, 8);
+    context.fillStyle = "#d7e6ad";
+    context.beginPath();
+    context.arc(3.5, -15, 2.7, 0, Math.PI * 2);
+    context.fill();
+
+    // Cab and windows sit behind the boiler, with the tender immediately
+    // behind the cab as on an early 20th-century steam locomotive.
+    context.fillStyle = "#1b352d";
+    context.fillRect(64, -38, 29, 22);
+    context.fillRect(61, -41, 35, 4);
+    context.fillStyle = "#cbdc9f";
+    context.fillRect(70, -34, 7, 8);
+    context.fillRect(82, -34, 7, 8);
+    context.fillStyle = "#274635";
+    context.fillRect(96, -24, 20, 18);
+    context.fillRect(94, -27, 24, 4);
     context.fillStyle = "#e0e9b8";
-    context.fillRect(54, -13, 5, 3);
-    // Five compact carriages make the train read as a long consist while it
-    // remains deliberately smaller than the surrounding forest.
-    [
-      { x: 66, color: "#315441" },
-      { x: 119, color: "#294a3a" },
-      { x: 172, color: "#315441" },
-      { x: 225, color: "#294a3a" },
-      { x: 278, color: "#315441" }
-    ].forEach((car) => {
-      context.fillStyle = car.color;
-      context.fillRect(car.x, -17, 48, 15);
+    context.fillRect(105, -21, 3, 4);
+
+    for (let index = 0; index < carriageCount; index += 1) {
+      const carX = 123 + index * carriagePitch;
+      const carColor = index % 3 === 1 ? "#294a3a" : index % 3 === 2 ? "#355640" : "#315441";
+      context.fillStyle = carColor;
+      context.fillRect(carX, -18, 58, 15);
       context.fillStyle = "#1b352c";
-      context.fillRect(car.x - 2, -21, 52, 4);
+      context.fillRect(carX - 2, -22, 62, 4);
       context.fillStyle = "#cbdba0";
-      context.fillRect(car.x + 7, -14, 7, 5);
-      context.fillRect(car.x + 20, -14, 7, 5);
-      context.fillRect(car.x + 33, -14, 7, 5);
-    });
-    context.fillStyle = "#172f28";
-    [20, 48, 79, 103, 132, 156, 185, 209, 238, 262, 291, 315, 340].forEach((wheelX) => {
+      context.fillRect(carX + 7, -15, 6, 5);
+      context.fillRect(carX + 20, -15, 6, 5);
+      context.fillRect(carX + 33, -15, 6, 5);
+      context.fillRect(carX + 46, -15, 6, 5);
+      context.fillStyle = "#172f28";
       context.beginPath();
-      context.arc(wheelX, -1, 4.2, 0, Math.PI * 2);
+      context.arc(carX + 9, -1, 3.5, 0, Math.PI * 2);
+      context.arc(carX + 50, -1, 3.5, 0, Math.PI * 2);
       context.fill();
-    });
+    }
+    context.restore();
+  }
+
+  function drawSteam() {
+    const targetScreenX = view.width * 0.2;
+    const targetBaseX = view.width / 2 + (targetScreenX - view.width / 2) / settings.zoom;
+    const trainScale = 0.43;
+    const y = screenY(340 + Math.sin(elapsed * 1.75) * 0.5);
+    context.save();
+    context.translate(targetBaseX, y + 1.1 * view.scale);
+    context.scale(-trainScale * view.scale, trainScale * view.scale);
+    context.filter = "blur(7px)";
+    for (let puff = 0; puff < 9; puff += 1) {
+      const cycle = ((elapsed * 23 - puff * 19) % 220 + 220) % 220;
+      const age = cycle / 220;
+      const radius = 15 + age * 27 + Math.sin(elapsed * 1.2 + puff) * 2.2;
+      // Positive local x is mirrored behind the right-facing locomotive,
+      // making the rising smoke drift toward screen-left.
+      const x = 29 + age * 35 + Math.sin(elapsed * 0.85 + puff * 1.1) * (3 + age * 7);
+      const smokeY = -43 - age * 230;
+      context.globalAlpha = (0.64 + (puff % 3) * 0.035) * (1 - age) * 0.88;
+      context.fillStyle = puff % 2 ? "#edf1e9" : "#d7e1da";
+      context.beginPath();
+      context.ellipse(x, smokeY, radius * 1.2, radius * 0.8, -0.18, 0, Math.PI * 2);
+      context.fill();
+    }
     context.restore();
   }
 
@@ -552,6 +781,7 @@
     drawForestLayer(forestLayers[4], 4, time, travel, canopy, detail);
     drawBridge(time, travel);
     drawTrain();
+    drawSteam();
     drawForestLayer(foregroundLayers[0], 5, time, travel, canopy, detail);
     drawForestLayer(foregroundLayers[1], 6, time, travel, canopy, detail);
     drawCloudLayer(1.34, { spacing: 920, minWidth: 250, maxWidth: 420, minHeight: 50, maxHeight: 96, minY: 335, maxY: 462, seed: 257 }, time, travel, true);
@@ -597,8 +827,13 @@
 
   document.addEventListener("visibilitychange", () => {
     visible = document.visibilityState === "visible";
-    if (visible) startAnimation();
-    else stopAnimation();
+    if (visible) {
+      startAnimation();
+      if (audioUnlocked) scheduleNextRumble(false);
+    } else {
+      stopAnimation();
+      stopRumbleForHiddenPage();
+    }
   });
 
   window.addEventListener("resize", () => {
